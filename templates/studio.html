@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RAG Studio · Self-RAG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20260313e" />
+  <script src="{{ url_for('static', filename='js/studio.js') }}?v=20260313d" defer></script>
+</head>
+<body class="studio-body">
+  <div class="site-shell studio-shell">
+
+    <!-- ── Announcement bar ── -->
+    <header class="announce-bar studio-announce">
+      <span class="spark">✦</span>
+      RAG Studio — Interactive Self-RAG testing environment
+      <span class="spark">✦</span>
+    </header>
+
+    <!-- ── Navigation ── -->
+    <nav class="navbar">
+      <div class="brand-lockup">
+        <div class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="brand-copy">
+          <strong>RAG Studio</strong>
+          <span>Self-RAG · Groq · Gemini</span>
+        </div>
+      </div>
+      <div class="nav-links">
+        <a href="/">← Home</a>
+        <span id="backend-status" class="badge">Checking...</span>
+        <button id="reset-btn" class="btn nav-cta" type="button">Reset Session</button>
+      </div>
+    </nav>
+
+    <!-- ── Studio Layout ── -->
+    <div class="studio-layout">
+
+      <!-- ══════════════════════════════════════
+           LEFT COLUMN: Setup
+      ══════════════════════════════════════ -->
+      <aside class="studio-sidebar">
+        <section class="studio-panel" id="setup-panel">
+          <div class="studio-panel-header">
+            <span class="studio-panel-num">01</span>
+            <h2>Knowledge Base</h2>
+          </div>
+
+          <div class="studio-field">
+            <label for="model-select">LLM Model</label>
+            <select id="model-select" class="studio-select"></select>
+          </div>
+
+          <div class="studio-field">
+            <label for="pdf-files">Upload PDF Files</label>
+            <div class="drop-zone" id="drop-zone">
+              <div class="drop-zone-inner">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M12 16V8m0 0l-3 3m3-3l3 3" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M20 16.7A5 5 0 0018 7h-1.26A8 8 0 104 15.3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Drop PDFs here or</span>
+                <label for="pdf-files" class="drop-browse">browse</label>
+              </div>
+              <input id="pdf-files" type="file" accept=".pdf" multiple />
+              <div id="file-list" class="file-list"></div>
+            </div>
+          </div>
+
+          <button id="process-btn" class="btn studio-primary-btn" type="button" disabled>
+            <span class="btn-spinner hidden" id="process-spinner"></span>
+            Build Knowledge Base
+          </button>
+
+          <div id="status-box" class="studio-status">Ready to process documents.</div>
+
+          <div id="doc-meta" class="doc-meta hidden">
+            <div class="doc-meta-header">
+              <span class="doc-meta-title">Loaded Files</span>
+              <span id="chunk-label" class="chunk-badge"></span>
+            </div>
+            <ul id="doc-list" class="studio-doc-list"></ul>
+          </div>
+        </section>
+
+        <!-- Pipeline Step Tracker -->
+        <section class="studio-panel" id="pipeline-tracker-panel">
+          <div class="studio-panel-header">
+            <span class="studio-panel-num">02</span>
+            <h2>Pipeline View</h2>
+          </div>
+          <div class="pipeline-tracker" id="pipeline-tracker">
+            <div class="pt-step" data-step="query">
+              <div class="pt-dot"></div>
+              <div class="pt-info">
+                <strong>Query Received</strong>
+                <small>Waiting for input</small>
+              </div>
+            </div>
+            <div class="pt-line"></div>
+            <div class="pt-step" data-step="retrieval">
+              <div class="pt-dot"></div>
+              <div class="pt-info">
+                <strong>Retrieval Decision</strong>
+                <small>Adaptive gate check</small>
+              </div>
+            </div>
+            <div class="pt-line"></div>
+            <div class="pt-step" data-step="retrieve">
+              <div class="pt-dot"></div>
+              <div class="pt-info">
+                <strong>Document Retrieval</strong>
+                <small>FAISS vector search</small>
+              </div>
+            </div>
+            <div class="pt-line"></div>
+            <div class="pt-step" data-step="evaluation">
+              <div class="pt-dot"></div>
+              <div class="pt-info">
+                <strong>Self-Evaluation</strong>
+                <small>IsSUP + IsUSE checks</small>
+              </div>
+            </div>
+            <div class="pt-line"></div>
+            <div class="pt-step" data-step="generation">
+              <div class="pt-dot"></div>
+              <div class="pt-info">
+                <strong>Answer Generation</strong>
+                <small>Grounded synthesis</small>
+              </div>
+            </div>
+          </div>
+        </section>
+      </aside>
+
+      <!-- ══════════════════════════════════════
+           MAIN COLUMN: Query + Response
+      ══════════════════════════════════════ -->
+      <main class="studio-main">
+        <!-- Query Input -->
+        <section class="studio-panel studio-query-panel">
+          <div class="studio-panel-header">
+            <span class="studio-panel-num">03</span>
+            <h2>Query Input</h2>
+          </div>
+          <div class="query-bar">
+            <textarea
+              id="query-input"
+              class="query-textarea"
+              placeholder="Ask a question about your uploaded documents…"
+              rows="3"
+              autocomplete="off"
+            ></textarea>
+            <button id="run-btn" class="btn studio-run-btn" type="button" disabled>
+              <span class="btn-spinner hidden" id="run-spinner"></span>
+              <span id="run-btn-label">Run Self-RAG</span>
+            </button>
+          </div>
+          <div id="query-error" class="query-error hidden"></div>
+        </section>
+
+        <!-- Response Panel -->
+        <section class="studio-panel studio-response-panel">
+          <div class="studio-panel-header">
+            <span class="studio-panel-num">04</span>
+            <h2>Generated Response</h2>
+            <div class="response-badges" id="response-badges"></div>
+          </div>
+          <div id="response-area" class="response-area">
+            <div class="response-placeholder">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32">
+                <path d="M8 10h8M8 14h5" stroke-linecap="round"/>
+                <rect x="3" y="3" width="18" height="18" rx="4"/>
+              </svg>
+              <p>Run a query to see the Self-RAG generated response here.</p>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- ══════════════════════════════════════
+           RIGHT COLUMN: Docs + Evaluation
+      ══════════════════════════════════════ -->
+      <aside class="studio-right">
+        <!-- Retrieved Documents -->
+        <section class="studio-panel" id="docs-panel">
+          <div class="studio-panel-header">
+            <span class="studio-panel-num">05</span>
+            <h2>Retrieved Documents</h2>
+            <span id="docs-count" class="count-badge"></span>
+          </div>
+          <div id="docs-area" class="docs-area">
+            <div class="docs-placeholder">
+              Retrieved document chunks will appear here after a query.
+            </div>
+          </div>
+        </section>
+
+        <!-- Self-Evaluation Panel -->
+        <section class="studio-panel" id="eval-panel">
+          <div class="studio-panel-header">
+            <span class="studio-panel-num">06</span>
+            <h2>Self-Evaluation</h2>
+          </div>
+          <div id="eval-area" class="eval-area">
+            <div class="eval-placeholder">
+              Evaluation metrics will appear here after a query.
+            </div>
+          </div>
+        </section>
+      </aside>
+
+    </div><!-- /.studio-layout -->
+  </div><!-- /.site-shell -->
+
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="loading-card">
+      <div class="loading-spinner"></div>
+      <p id="loading-label">Running Self-RAG pipeline…</p>
+      <small>This may take 15–30 seconds</small>
+    </div>
+  </div>
+
+</body>
+</html>
