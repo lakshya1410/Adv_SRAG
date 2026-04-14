@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RAG Studio | Self-RAG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20260413g" />
+  <script src="{{ url_for('static', filename='js/studio.js') }}?v=20260413g" defer></script>
+</head>
+<body class="studio-body">
+  <div class="studio-sidebar-backdrop hidden" id="sidebar-backdrop"></div>
+
+  <aside class="studio-sidebar-container" id="sidebar-container">
+    <div class="sidebar-content">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          <div class="sidebar-title-row">
+            <h1>RAG Studio</h1>
+            <span class="backend-status-pill checking" id="backend-status">Checking...</span>
+          </div>
+          <p>Upload documents and ask grounded questions.</p>
+        </div>
+      </div>
+
+      <div class="sidebar-top-card">
+        <button class="sidebar-new-chat" id="new-session-btn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          New Session
+        </button>
+      </div>
+
+      <section class="sidebar-section">
+        <div class="sidebar-section-header">
+          <span class="sidebar-section-icon" aria-hidden="true">KB</span>
+          <h3>Knowledge Base</h3>
+        </div>
+        <p class="sidebar-section-copy">Choose a model, upload PDFs, and build the document index for this session.</p>
+
+        <div class="sidebar-field">
+          <label for="model-select">LLM Model</label>
+          <select id="model-select" class="sidebar-select"></select>
+        </div>
+
+        <div class="sidebar-field">
+          <label for="pdf-files">Upload PDFs</label>
+          <div class="sidebar-drop-zone" id="drop-zone">
+            <input id="pdf-files" type="file" accept=".pdf" multiple />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M12 16V8m0 0L9 11m3-3l3 3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Click or drop PDF files</span>
+          </div>
+          <div class="sidebar-file-list" id="file-list"></div>
+        </div>
+
+        <button id="process-btn" class="sidebar-primary-btn" type="button" disabled>
+          <span class="btn-spinner hidden" id="process-spinner"></span>
+          Build Knowledge Base
+        </button>
+
+        <div class="sidebar-status-box" id="status-box">Upload PDFs and click Build Knowledge Base.</div>
+
+        <div class="sidebar-doc-meta hidden" id="doc-meta">
+          <div class="sidebar-doc-meta-label" id="chunk-label">0 chunks indexed</div>
+          <ul class="sidebar-doc-list" id="doc-list"></ul>
+        </div>
+      </section>
+
+      <div class="sidebar-footer">
+        <a href="/">Back to Home</a>
+        <button id="reset-btn" class="sidebar-reset-btn" type="button">Reset Session</button>
+        <div class="built-by built-by-sidebar">
+          Built by <a href="https://lakshyatripathi.tech/" target="_blank" rel="noopener noreferrer">lakshyatripathi.tech</a>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="studio-main-layout">
+    <header class="studio-header">
+      <button class="sidebar-mobile-toggle" id="sidebar-mobile-toggle" aria-label="Open sidebar" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <div class="studio-header-title">
+        <h1>RAG Studio</h1>
+        <p>Interactive Self-RAG testing</p>
+      </div>
+    </header>
+
+    <div class="studio-chat-container">
+      <div class="studio-response-feed" id="response-area">
+        <div class="response-placeholder" id="response-placeholder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="44" height="44">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 8v4m0 4h.01" stroke-linecap="round"/>
+          </svg>
+          <h2>Welcome to RAG Studio</h2>
+          <p>Upload PDFs, build your knowledge base, then ask grounded questions about your documents.</p>
+        </div>
+      </div>
+
+      <div class="studio-panels hidden" id="results-panels">
+        <div class="studio-panel" id="docs-panel">
+          <div class="studio-panel-header">
+            <h2>Retrieved Documents</h2>
+            <span class="docs-count-badge" id="docs-count-badge">0</span>
+          </div>
+          <div class="docs-list" id="docs-area">
+            <div class="docs-placeholder">Run a query to see retrieved chunks here.</div>
+          </div>
+        </div>
+        <div class="studio-panel" id="eval-panel">
+          <div class="studio-panel-header">
+            <h2>Evaluation</h2>
+            <span class="studio-panel-num" id="eval-num">--</span>
+          </div>
+          <div class="eval-list" id="eval-area">
+            <div class="eval-placeholder">Evaluation metrics appear here after a query.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="studio-input-area">
+      <div id="query-error" class="query-error hidden"></div>
+      <div class="query-input-wrapper">
+        <textarea
+          id="query-input"
+          class="query-textarea"
+          placeholder="Ask a question about your uploaded documents..."
+          rows="1"
+          autocomplete="off"
+        ></textarea>
+        <button id="run-btn" class="studio-send-btn" type="button" disabled aria-label="Run query">
+          <span class="btn-spinner hidden" id="run-spinner"></span>
+          <svg id="run-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </div>
+      <p class="query-help">Press Enter to send. Use Shift + Enter for a new line.</p>
+    </div>
+  </div>
+
+  <div class="loading-overlay hidden" id="loading-overlay">
+    <div class="loading-card">
+      <div class="loading-spinner"></div>
+      <p id="loading-label">Running Self-RAG pipeline...</p>
+      <small>May take 15-30 seconds</small>
+    </div>
+  </div>
+</body>
+</html>

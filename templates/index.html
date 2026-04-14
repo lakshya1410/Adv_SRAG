@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Self-RAG | Intelligent Retrieval-Augmented Generation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20260413g" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js" defer></script>
+  <script src="{{ url_for('static', filename='js/charts.js') }}?v=20260413b" defer></script>
+</head>
+<body>
+  <div class="site-shell">
+    <header class="announce-bar">
+      <span class="spark">*</span>
+      Self-RAG uses adaptive retrieval and self-grounding to reduce hallucinations
+      <span class="spark">*</span>
+    </header>
+
+    <nav class="navbar">
+      <div class="brand-lockup">
+        <div class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="brand-copy">
+          <strong>Self-RAG</strong>
+          <span>Groq | Qwen3-VL | LangGraph</span>
+        </div>
+      </div>
+      <div class="nav-links">
+        <a href="#how-it-works">How it Works</a>
+        <a href="#pipeline">Pipeline</a>
+        <a href="#metrics">Metrics</a>
+        <a href="#architecture">Architecture</a>
+        <a href="/studio" class="btn nav-cta">Open RAG Studio</a>
+      </div>
+    </nav>
+
+    <section class="lp-hero">
+      <div class="hero-pill">Adaptive | Self-grounding | Query Rewriting</div>
+      <h1>
+        Self-RAG:<br />
+        <span>Intelligent Retrieval-</span><br />
+        <span>Augmented Generation</span>
+      </h1>
+      <p class="hero-desc">
+        Self-RAG lets models evaluate retrieved information on the fly, decide whether more retrieval is needed,
+        verify claims through IsSUP grounding, and confirm answers are useful through IsUSE before responding.
+      </p>
+      <div class="hero-actions">
+        <a class="btn hero-btn primary" href="/studio">Try RAG Studio</a>
+        <a class="btn hero-btn secondary" href="#how-it-works">Learn How It Works</a>
+      </div>
+      <div class="hero-stats">
+        <div class="stat-chip"><strong>9</strong> Pipeline Nodes</div>
+        <div class="stat-chip"><strong>IsSUP</strong> Claim Grounding</div>
+        <div class="stat-chip"><strong>IsUSE</strong> Usefulness Check</div>
+        <div class="stat-chip"><strong>Groq</strong> + Qwen3-VL Embeddings</div>
+      </div>
+    </section>
+
+    <section id="how-it-works" class="lp-section">
+      <div class="section-label">How It Works</div>
+      <h2 class="section-title">Three Pillars of Reliable RAG</h2>
+      <p class="section-sub">
+        Traditional RAG retrieves and generates blindly. Self-RAG adds intelligence at every step of the pipeline.
+      </p>
+      <div class="pillars-grid">
+        <div class="pillar-card">
+          <div class="pillar-icon">
+            <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="18" cy="18" r="10" stroke="currentColor" stroke-width="2"/>
+              <path d="M26 26l6 6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <span class="pillar-step">01</span>
+          <h3>Retrieval</h3>
+          <p>
+            Decides whether retrieval is needed at all. General questions can be answered directly, while
+            document-specific prompts trigger FAISS vector search for relevant chunks.
+          </p>
+          <ul class="pillar-tags">
+            <li>Adaptive retrieval gate</li>
+            <li>FAISS top-k search</li>
+            <li>Relevance filtering</li>
+          </ul>
+        </div>
+        <div class="pillar-card featured">
+          <div class="pillar-icon">
+            <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="4" y="4" width="32" height="32" rx="6" stroke="currentColor" stroke-width="2"/>
+              <path d="M12 20l6 6 10-12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <span class="pillar-step">02</span>
+          <h3>Self-Evaluation</h3>
+          <p>
+            Two judges run after answer generation. IsSUP checks whether claims are grounded in context, and
+            IsUSE verifies the answer actually addresses the user question.
+          </p>
+          <ul class="pillar-tags">
+            <li>IsSUP grounding check</li>
+            <li>IsUSE usefulness check</li>
+            <li>Strict quote-only revision</li>
+          </ul>
+        </div>
+        <div class="pillar-card">
+          <div class="pillar-icon">
+            <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M8 12h24M8 20h16M8 28h20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="32" cy="28" r="5" stroke="currentColor" stroke-width="2"/>
+              <path d="M35 31l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <span class="pillar-step">03</span>
+          <h3>Generation</h3>
+          <p>
+            The system only returns a final answer after the evaluation loop passes. If the answer is not useful,
+            it rewrites the query and retries automatically up to three times.
+          </p>
+          <ul class="pillar-tags">
+            <li>Grounded answer generation</li>
+            <li>Automatic query rewriting</li>
+            <li>Up to 3 retry cycles</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="pipeline" class="lp-section lp-alt-section">
+      <div class="section-label">Pipeline</div>
+      <h2 class="section-title">9-Node Self-RAG Pipeline</h2>
+      <p class="section-sub">
+        A LangGraph state machine connects every reasoning step. Each node makes an explicit decision before passing state forward.
+      </p>
+      <div class="pipeline-flow">
+        <div class="pf-node pf-start">
+          <div class="pf-icon">Q</div>
+          <strong>User Query</strong>
+        </div>
+        <div class="pf-arrow">&darr;</div>
+        <div class="pf-node">
+          <span class="pf-num">1</span>
+          <strong>Decide Retrieval</strong>
+          <small>Is external context needed?</small>
+        </div>
+        <div class="pf-split">
+          <div class="pf-branch pf-branch-left">
+            <div class="pf-branch-label">No retrieval</div>
+            <div class="pf-node pf-direct">
+              <span class="pf-num">2</span>
+              <strong>Generate Direct</strong>
+              <small>Answer from model knowledge</small>
+            </div>
+          </div>
+          <div class="pf-branch pf-branch-right">
+            <div class="pf-branch-label">Needs retrieval</div>
+            <div class="pf-node">
+              <span class="pf-num">3</span>
+              <strong>Retrieve</strong>
+              <small>FAISS top-k search</small>
+            </div>
+            <div class="pf-arrow">&darr;</div>
+            <div class="pf-node">
+              <span class="pf-num">4</span>
+              <strong>Relevance Filter</strong>
+              <small>Keep on-topic chunks</small>
+            </div>
+            <div class="pf-arrow">&darr;</div>
+            <div class="pf-node">
+              <span class="pf-num">5</span>
+              <strong>Generate from Context</strong>
+              <small>Grounded RAG answer</small>
+            </div>
+            <div class="pf-arrow">&darr;</div>
+            <div class="pf-node pf-eval">
+              <span class="pf-num">6</span>
+              <strong>IsSUP Check</strong>
+              <small>Verify claims against context</small>
+            </div>
+            <div class="pf-arrow">&darr;</div>
+            <div class="pf-node pf-eval">
+              <span class="pf-num">7</span>
+              <strong>Revise Answer</strong>
+              <small>Quote-only revision if needed</small>
+            </div>
+            <div class="pf-arrow">&darr;</div>
+            <div class="pf-node pf-eval">
+              <span class="pf-num">8</span>
+              <strong>IsUSE Check</strong>
+              <small>Does the answer address the question?</small>
+            </div>
+            <div class="pf-arrow">&darr;</div>
+            <div class="pf-node pf-rewrite">
+              <span class="pf-num">9</span>
+              <strong>Rewrite and Retry</strong>
+              <small>Smarter query and re-retrieve up to 3x</small>
+            </div>
+          </div>
+        </div>
+        <div class="pf-arrow">&darr;</div>
+        <div class="pf-node pf-end">
+          <div class="pf-icon">OK</div>
+          <strong>Final Answer</strong>
+          <small>Grounded, verified, useful</small>
+        </div>
+      </div>
+    </section>
+
+    <section id="metrics" class="lp-section">
+      <div class="section-label">Metrics</div>
+      <h2 class="section-title">Self-RAG vs Traditional RAG</h2>
+      <p class="section-sub">
+        Self-grounding evaluation and adaptive retrieval improve answer quality compared to a vanilla RAG flow.
+      </p>
+      <div class="chart-wrap">
+        <div class="chart-card">
+          <h3>Performance Comparison</h3>
+          <canvas id="comparisonChart" height="260"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Quality Radar</h3>
+          <canvas id="radarChart" height="260"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section id="architecture" class="lp-section lp-alt-section">
+      <div class="section-label">Architecture</div>
+      <h2 class="section-title">System Architecture</h2>
+      <p class="section-sub">
+        Built on Groq for fast inference, Qwen3-VL embeddings for semantic search, and FAISS for local vector storage, all orchestrated by LangGraph.
+      </p>
+      <div class="arch-diagram">
+        <div class="arch-row">
+          <div class="arch-node arch-user">
+            <div class="arch-icon">U</div>
+            <strong>User Query</strong>
+            <small>Natural language question</small>
+          </div>
+        </div>
+        <div class="arch-conn">&darr;</div>
+        <div class="arch-row arch-row-2">
+          <div class="arch-node">
+            <div class="arch-icon">EMB</div>
+            <strong>Embedding Model</strong>
+            <small>Qwen3-VL-Embedding-2B</small>
+          </div>
+          <div class="arch-node arch-accent">
+            <div class="arch-icon">LLM</div>
+            <strong>Groq LLM</strong>
+            <small>LLaMA 3.3 / Mixtral / Gemma</small>
+          </div>
+        </div>
+        <div class="arch-conn">&darr;</div>
+        <div class="arch-row">
+          <div class="arch-node">
+            <div class="arch-icon">DB</div>
+            <strong>FAISS Vector DB</strong>
+            <small>Local semantic chunk store</small>
+          </div>
+        </div>
+        <div class="arch-conn">&darr;</div>
+        <div class="arch-row arch-row-3">
+          <div class="arch-node">
+            <div class="arch-icon">RET</div>
+            <strong>Retriever</strong>
+            <small>Top-k similarity search</small>
+          </div>
+          <div class="arch-node arch-accent">
+            <div class="arch-icon">EVAL</div>
+            <strong>Self-Evaluation</strong>
+            <small>IsSUP + IsUSE judges</small>
+          </div>
+          <div class="arch-node">
+            <div class="arch-icon">GEN</div>
+            <strong>Generator</strong>
+            <small>Grounded answer synthesis</small>
+          </div>
+        </div>
+        <div class="arch-conn">&darr;</div>
+        <div class="arch-row">
+          <div class="arch-node arch-accent">
+            <div class="arch-icon">OUT</div>
+            <strong>Final Response</strong>
+            <small>Verified, grounded answer</small>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="lp-cta-section">
+      <h2>Ready to test your documents?</h2>
+      <p>Upload PDFs, build a knowledge base, and run queries through the full Self-RAG pipeline.</p>
+      <a class="btn hero-btn primary" href="/studio">Open RAG Studio</a>
+    </section>
+
+    <footer class="lp-footer">
+      <div class="brand-lockup">
+        <div class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="brand-copy">
+          <strong>Self-RAG</strong>
+          <span>Groq | Qwen3-VL | LangGraph | Flask</span>
+        </div>
+      </div>
+      <div class="footer-links">
+        <a href="/">Home</a>
+        <a href="/studio">RAG Studio</a>
+        <a href="#pipeline">Pipeline</a>
+        <a href="#metrics">Metrics</a>
+      </div>
+      <div class="built-by">
+        Built by <a href="https://lakshyatripathi.tech/" target="_blank" rel="noopener noreferrer">lakshyatripathi.tech</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>
