@@ -481,8 +481,8 @@
 ### Simplified Configuration
 
 ```diff
-  GROQ_API_KEY=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
-- HUGGINGFACE_TOKEN=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
+  GROQ_API_KEY=<your_groq_api_key>
+- HUGGINGFACE_TOKEN=<your_huggingface_token>
 ```
 
 ---
