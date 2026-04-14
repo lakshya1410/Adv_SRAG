@@ -1,3 +1,4 @@
+
 @echo off
 echo ================================================
 echo   Self-RAG Streamlit App Setup (Windows)

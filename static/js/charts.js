@@ -52,7 +52,8 @@ function buildComparisonChart(ctx) {
     },
     options: {
       responsive: true,
-      maintainAspectRatio: false,
+      maintainAspectRatio: true,
+      aspectRatio: 1.7,
       resizeDelay: 220,
       scales: {
         x: {
@@ -137,7 +138,8 @@ function buildRadarChart(ctx) {
     },
     options: {
       responsive: true,
-      maintainAspectRatio: false,
+      maintainAspectRatio: true,
+      aspectRatio: 1.15,
       resizeDelay: 220,
       scales: {
         r: {

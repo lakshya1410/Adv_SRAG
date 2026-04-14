@@ -9,6 +9,8 @@ from flask import Flask, jsonify, render_template, request
 from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 
+import embedding_service
+
 load_dotenv()
 
 ALLOWED_EXTENSIONS = {"pdf"}
@@ -29,13 +31,17 @@ class RuntimeState:
         self.doc_names: list[str] = []
         self.chunk_count = 0
         self.model_name = MODEL_OPTIONS[0]
+        self.session_id: str | None = None
         self.lock = Lock()
 
     def reset(self) -> None:
+        if self.session_id is not None:
+            embedding_service.delete_session(self.session_id)
         self.pipeline = None
         self.docs_loaded = False
         self.doc_names = []
         self.chunk_count = 0
+        self.session_id = None
 
 
 runtime = RuntimeState()
@@ -123,31 +129,32 @@ def create_app() -> Flask:
 
     @app.post("/api/process-documents")
     def process_documents() -> Any:
-        groq_api_key = os.getenv("GROQ_API_KEY", "")
+        """
+        Upload and process PDF documents to build a retrieval-augmented generation knowledge base.
+        
+        Expected form data:
+        - files: Multiple PDF files (multipart/form-data)
+        - model_name: (Optional) Name of the LLM model to use
+        
+        Returns:
+            JSON with OK status, chunk count, document names, and model name.
+        """
+        groq_api_key = os.getenv("GROQ_API_KEY", "").strip()
         if not groq_api_key:
             return jsonify({"ok": False, "error": "GROQ_API_KEY is not set in environment."}), 500
-
-        google_api_key = os.getenv("GOOGLE_API_KEY", "")
-        if not google_api_key:
-            return jsonify(
-                {
-                    "ok": False,
-                    "error": "GOOGLE_API_KEY is not set. It is required for Gemini embeddings.",
-                }
-            ), 500
 
         uploaded_files = request.files.getlist("files")
         model_name = (request.form.get("model_name") or MODEL_OPTIONS[0]).strip()
 
         if model_name not in MODEL_OPTIONS:
-            return jsonify({"ok": False, "error": "Invalid model selected."}), 400
+            return jsonify({"ok": False, "error": f"Invalid model '{model_name}'. Allowed: {', '.join(MODEL_OPTIONS)}"}), 400
 
         if not uploaded_files:
             return jsonify({"ok": False, "error": "Please upload at least one PDF file."}), 400
 
         valid_files = [f for f in uploaded_files if f and f.filename and _is_allowed(f.filename)]
         if not valid_files:
-            return jsonify({"ok": False, "error": "Only PDF files are supported."}), 400
+            return jsonify({"ok": False, "error": "Only PDF files (.pdf) are supported."}), 400
 
         with tempfile.TemporaryDirectory() as temp_dir:
             file_paths: list[str] = []
@@ -158,7 +165,10 @@ def create_app() -> Flask:
                 if not safe_name:
                     continue
                 dest = Path(temp_dir) / safe_name
-                uf.save(dest)
+                try:
+                    uf.save(dest)
+                except Exception as e:
+                    return jsonify({"ok": False, "error": f"File save error: {e}"}), 500
                 file_paths.append(str(dest))
                 doc_names.append(safe_name)
 
@@ -171,18 +181,32 @@ def create_app() -> Flask:
 
                 pipeline = SelfRAGPipeline(groq_api_key=groq_api_key, model_name=model_name)
                 chunk_count = pipeline.load_documents(file_paths)
+                
             except ModuleNotFoundError as exc:
                 return jsonify(
                     {
                         "ok": False,
                         "error": (
-                            "Missing Python dependency: "
-                            f"{exc}. Install requirements with 'pip install -r requirements.txt'."
+                            "Missing Python dependency. Install requirements with:\n"
+                            f"pip install -r requirements.txt\n\nDetails: {exc}"
                         ),
                     }
                 ), 500
+            except RuntimeError as exc:
+                # Catch embedding and pipeline errors
+                return jsonify(
+                    {
+                        "ok": False,
+                        "error": f"Document processing failed: {str(exc)[:500]}",
+                    }
+                ), 500
             except Exception as exc:
-                return jsonify({"ok": False, "error": f"Document processing failed: {exc}"}), 500
+                return jsonify(
+                    {
+                        "ok": False,
+                        "error": f"Unexpected error: {type(exc).__name__}: {str(exc)[:500]}",
+                    }
+                ), 500
 
         with runtime.lock:
             runtime.pipeline = pipeline
@@ -190,6 +214,7 @@ def create_app() -> Flask:
             runtime.doc_names = doc_names
             runtime.chunk_count = chunk_count
             runtime.model_name = model_name
+            runtime.session_id = pipeline.session_id
 
         return jsonify(
             {
@@ -226,12 +251,23 @@ def create_app() -> Flask:
 
     @app.post("/query")
     def query() -> Any:
-        """Studio-friendly endpoint. Returns documents, evaluation, and response."""
+        """
+        Studio-friendly endpoint. Runs the Self-RAG pipeline and returns comprehensive results.
+        
+        Expected JSON:
+        - query: The question to ask about the documents
+        
+        Returns:
+            JSON with documents retrieved, evaluation metrics, and generated response.
+        """
         payload = request.get_json(silent=True) or {}
         question = (payload.get("query") or "").strip()
 
         if not question:
             return jsonify({"ok": False, "error": "Query is required."}), 400
+
+        if len(question) > 2000:
+            return jsonify({"ok": False, "error": "Query is too long (max 2000 chars)."}), 400
 
         with runtime.lock:
             pipeline = runtime.pipeline
@@ -249,6 +285,7 @@ def create_app() -> Flask:
                     "text": (getattr(d, "page_content", "") or "").strip()[:400],
                     "source": (getattr(d, "metadata", {}) or {}).get("source", ""),
                     "page": (getattr(d, "metadata", {}) or {}).get("page", ""),
+                    "score": (getattr(d, "metadata", {}) or {}).get("score", 0),
                 }
                 for d in (result.get("relevant_docs") or [])
             ]
@@ -271,8 +308,21 @@ def create_app() -> Flask:
                 "need_retrieval": details["need_retrieval"],
             }
 
+        except RuntimeError as exc:
+            # Catch specific pipeline errors
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": f"Pipeline error: {str(exc)[:500]}",
+                }
+            ), 500
         except Exception as exc:
-            return jsonify({"ok": False, "error": f"Pipeline error: {exc}"}), 500
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": f"Unexpected error: {type(exc).__name__}: {str(exc)[:500]}",
+                }
+            ), 500
 
         return jsonify({"ok": True, "documents": documents, "evaluation": evaluation, "response": answer})
 

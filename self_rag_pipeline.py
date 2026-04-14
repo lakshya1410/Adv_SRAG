@@ -1,7 +1,7 @@
 """
 self_rag_pipeline.py
 ────────────────────
-Self-RAG pipeline using Groq LLM + Gemini embedding-2 embeddings.
+Self-RAG pipeline using Groq LLM + Qwen3-VL-Embedding-2B embeddings.
 
 Pipeline nodes (in order):
   1. decide_retrieval  – is external retrieval needed?
@@ -18,20 +18,18 @@ Pipeline nodes (in order):
 from typing import List, TypedDict, Literal, Optional
 from pydantic import BaseModel, Field
 
-from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import PyPDFLoader
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 from langgraph.graph import StateGraph, START, END
 
+import embedding_service
+
 # ── Constants ────────────────────────────────────────────────────────────────
 MAX_RETRIES = 10        # max IsSUP → revise cycles
 MAX_REWRITE_TRIES = 3   # max IsUSE → rewrite cycles
-
-EMBEDDING_MODEL = "gemini-embedding-2-preview"
 
 # ── Graph State ───────────────────────────────────────────────────────────────
 class State(TypedDict):
@@ -209,12 +207,12 @@ class SelfRAGPipeline:
         result = pipeline.run("What is the refund policy?")
     """
 
-    def __init__(self, groq_api_key: str, model_name: str = "llama-3.3-70b-versatile"):
+    def __init__(self, groq_api_key: str, model_name: str = "llama-3.3-70b-versatile", session_id: Optional[str] = None):
         self.groq_api_key = groq_api_key
         self.model_name = model_name
+        self.session_id = session_id or embedding_service.generate_session_id()
         self.retriever = None
         self.app = None
-        self._embeddings: Optional[GoogleGenerativeAIEmbeddings] = None
         self._setup_llm()
 
     # ── Private helpers ───────────────────────────────────────────────────────
@@ -227,10 +225,18 @@ class SelfRAGPipeline:
         self._isuse_llm = llm.with_structured_output(IsUSEDecision)
         self._rewrite_llm = llm.with_structured_output(RewriteDecision)
 
-    def _get_embeddings(self) -> GoogleGenerativeAIEmbeddings:
-        if self._embeddings is None:
-            self._embeddings = GoogleGenerativeAIEmbeddings(model=EMBEDDING_MODEL)
-        return self._embeddings
+    def _get_retriever(self):
+        """Build a retriever function backed by session-scoped FAISS."""
+        session_id = self.session_id
+
+        def _retrieve(query: str) -> List[Document]:
+            results = embedding_service.search_index(session_id, query, top_k=4)
+            return [
+                Document(page_content=r["text"], metadata={"score": r["score"]})
+                for r in results
+            ]
+
+        return _retrieve
 
     def _build_graph(self):
         """Compile the LangGraph state machine (called after documents are indexed)."""
@@ -254,7 +260,7 @@ class SelfRAGPipeline:
 
         def retrieve(state: State):
             q = state.get("retrieval_query") or state["question"]
-            return {"docs": pipeline.retriever.invoke(q)}
+            return {"docs": pipeline.retriever(q)}
 
         def is_relevant(state: State):
             relevant_docs: List[Document] = []
@@ -419,8 +425,10 @@ class SelfRAGPipeline:
             chunk_size=600, chunk_overlap=150
         ).split_documents(docs)
 
-        vector_store = FAISS.from_documents(chunks, self._get_embeddings())
-        self.retriever = vector_store.as_retriever(search_kwargs={"k": 4})
+        texts = [c.page_content for c in chunks]
+        embedding_service.add_to_index(self.session_id, texts)
+
+        self.retriever = self._get_retriever()
         self._build_graph()
         return len(chunks)
 
