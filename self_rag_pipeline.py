@@ -81,15 +81,20 @@ class RewriteDecision(BaseModel):
 
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
+# AFTER
 decide_retrieval_prompt = ChatPromptTemplate.from_messages([
     (
         "system",
         "You decide whether retrieval is needed.\n"
         "Return JSON with key: should_retrieve (boolean).\n\n"
         "Guidelines:\n"
-        "- should_retrieve=True  → answering requires specific facts from company documents.\n"
-        "- should_retrieve=False → general explanation or definition, no company context needed.\n"
-        "- If unsure, choose True.",
+        "- should_retrieve=True  → DEFAULT. Use this for almost all questions.\n"
+        "  Includes: explain, summarise, describe, analyse, what is, how does, "
+        "  tell me about, overview, brief, details, key points — even if no document "
+        "  is explicitly mentioned. Assume a document is always available.\n"
+        "- should_retrieve=False → ONLY for pure general knowledge with zero document "
+        "  relevance (e.g. 'what is 2+2', 'who wrote hamlet', 'define photosynthesis').\n"
+        "- When in doubt, always choose True.",
     ),
     ("human", "Question: {question}"),
 ])
@@ -121,12 +126,18 @@ is_relevant_prompt = ChatPromptTemplate.from_messages([
     ("human", "Question:\n{question}\n\nDocument:\n{document}"),
 ])
 
+# AFTER
 rag_generation_prompt = ChatPromptTemplate.from_messages([
     (
         "system",
-        "You are a business RAG chatbot.\n\n"
-        "Answer the question based solely on the CONTEXT from internal company documents.\n"
-        "Do not mention that you are using a context block.",
+        "You are a document assistant. The user has uploaded one or more documents.\n\n"
+        "Rules:\n"
+        "- Answer using ONLY the provided CONTEXT.\n"
+        "- If the user says 'explain', 'summarise', 'brief', or similar without specifying "
+        "  a topic, treat it as a request to explain the entire document.\n"
+        "- Do not mention that you are using a context block.\n"
+        "- If the context is insufficient, say: 'The document does not contain enough "
+        "  information to answer that.'",
     ),
     ("human", "Question:\n{question}\n\nContext:\n{context}"),
 ])
@@ -188,7 +199,7 @@ rewrite_for_retrieval_prompt = ChatPromptTemplate.from_messages([
         "- Preserve entity names (e.g. company name, plan names).\n"
         "- Add 2–5 high-signal domain keywords (policy, pricing, HR terms).\n"
         "- Remove filler words.\n"
-        "- Output JSON: {retrieval_query: '...'}",
+        "- Output JSON: {{retrieval_query: '...'}}",
     ),
     (
         "human",

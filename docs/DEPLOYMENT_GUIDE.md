@@ -1,10 +1,12 @@
-# Self-RAG: Complete System Analysis & Deployment Guide
+# Self-RAG: AWS + Docker Deployment Guide
 
-**Current Status**: ✅ **FULLY OPERATIONAL & TESTED**
+**Purpose**: Deploy Self-RAG application on AWS using Docker containerization with ECS, ECR, and supporting services.
+
+**Current Status**: ✅ **PRODUCTION-READY FOR AWS**
 
 ---
 
-## 📊 System Architecture (Complete Analysis)
+## 🏗️ AWS Architecture Overview
 
 ### Technology Stack
 

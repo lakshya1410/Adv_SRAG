@@ -1,4 +1,6 @@
 import os
+import sys
+import logging
 import tempfile
 from pathlib import Path
 from threading import Lock
@@ -10,6 +12,15 @@ from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 
 import embedding_service
+
+# ── Structured Logging for CloudWatch ──────────────────────────────────────
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -85,6 +96,7 @@ def create_app() -> Flask:
 
     @app.errorhandler(Exception)
     def handle_unexpected_error(exc: Exception) -> Any:
+        logger.error(f"Unhandled exception: {type(exc).__name__}: {exc}", exc_info=True)
         # Preserve normal HTTP behavior (404/405/etc.) for non-API routes.
         if isinstance(exc, HTTPException):
             return exc
@@ -103,8 +115,17 @@ def create_app() -> Flask:
         return render_template("studio.html")
 
     @app.route("/health")
-    def health() -> tuple[dict[str, str], int]:
-        return {"status": "ok"}, 200
+    def health() -> tuple[dict[str, Any], int]:
+        """Enhanced health check for load balancer."""
+        health_status = {
+            "status": "healthy" if runtime.docs_loaded else "ready",
+            "docs_loaded": runtime.docs_loaded,
+            "doc_count": len(runtime.doc_names),
+            "chunk_count": runtime.chunk_count,
+            "model": runtime.model_name,
+        }
+        logger.info(f"Health check: {health_status}")
+        return health_status, 200
 
     @app.get("/api/models")
     def models() -> Any:
@@ -333,5 +354,10 @@ app = create_app()
 
 
 if __name__ == "__main__":
-    debug_mode = os.getenv("FLASK_DEBUG", "0") == "1"
-    app.run(host="127.0.0.1", port=5000, debug=debug_mode, use_reloader=debug_mode)
+    # Production-ready configuration
+    host = os.getenv("FLASK_HOST", "0.0.0.0")  # Allow external connections
+    port = int(os.getenv("FLASK_PORT", "5000"))
+    debug_mode = os.getenv("FLASK_ENV", "production") == "development"
+    
+    logger.info(f"Starting Flask app on {host}:{port} (debug={debug_mode})")
+    app.run(host=host, port=port, debug=debug_mode, use_reloader=debug_mode)
